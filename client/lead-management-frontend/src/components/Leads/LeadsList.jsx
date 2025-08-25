@@ -2,12 +2,37 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AgGridReact } from 'ag-grid-react';
 import { toast } from 'react-toastify';
-import { LEAD_SOURCES, LEAD_STATUSES } from '../../utils/constants';
 import leadService from '../../services/leadService';
-import LoadingSpinner from '../Common/LoadingSpinner.jsx';
+import LeadFilters from './LeadFilters.jsx';
 
-// Simple Cell Renderers
-const ActionsRenderer = ({ data, onRefresh }) => {
+// Status Cell Component
+const StatusCell = ({ value }) => {
+  const getStatusStyle = (status) => {
+    const styles = {
+      new: { backgroundColor: '#007bff', color: 'white' },
+      contacted: { backgroundColor: '#ffc107', color: 'black' },
+      qualified: { backgroundColor: '#28a745', color: 'white' },
+      lost: { backgroundColor: '#dc3545', color: 'white' },
+      won: { backgroundColor: '#17a2b8', color: 'white' }
+    };
+    return styles[status] || { backgroundColor: '#6c757d', color: 'white' };
+  };
+
+  const style = {
+    ...getStatusStyle(value),
+    padding: '4px 8px',
+    borderRadius: '12px',
+    fontSize: '11px',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    display: 'inline-block'
+  };
+
+  return <span style={style}>{value}</span>;
+};
+
+// Actions Cell Component
+const ActionsCell = ({ data, onRefresh }) => {
   const navigate = useNavigate();
 
   const handleEdit = () => {
@@ -19,7 +44,6 @@ const ActionsRenderer = ({ data, onRefresh }) => {
       try {
         await leadService.deleteLead(data._id);
         toast.success('Lead deleted successfully');
-        // Call refresh function instead of window.location.reload()
         if (onRefresh) {
           onRefresh();
         }
@@ -30,17 +54,17 @@ const ActionsRenderer = ({ data, onRefresh }) => {
   };
 
   return (
-    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+    <div style={{ display: 'flex', gap: '5px' }}>
       <button 
         onClick={handleEdit}
         style={{
           padding: '4px 8px',
-          backgroundColor: '#2563eb',
+          fontSize: '12px',
+          backgroundColor: '#007bff',
           color: 'white',
           border: 'none',
           borderRadius: '4px',
-          cursor: 'pointer',
-          fontSize: '12px'
+          cursor: 'pointer'
         }}
       >
         Edit
@@ -49,12 +73,12 @@ const ActionsRenderer = ({ data, onRefresh }) => {
         onClick={handleDelete}
         style={{
           padding: '4px 8px',
-          backgroundColor: '#dc2626',
-          color: 'white', 
+          fontSize: '12px',
+          backgroundColor: '#dc3545',
+          color: 'white',
           border: 'none',
           borderRadius: '4px',
-          cursor: 'pointer',
-          fontSize: '12px'
+          cursor: 'pointer'
         }}
       >
         Delete
@@ -63,27 +87,10 @@ const ActionsRenderer = ({ data, onRefresh }) => {
   );
 };
 
-const StatusRenderer = ({ value }) => {
-  const status = LEAD_STATUSES.find(s => s.value === value);
-  return (
-    <span style={{ fontWeight: 'bold', color: '#2563eb' }}>
-      {status ? status.label : value}
-    </span>
-  );
-};
-
-const SourceRenderer = ({ value }) => {
-  const source = LEAD_SOURCES.find(s => s.value === value);
-  return (
-    <span style={{ fontWeight: '500', color: '#059669' }}>
-      {source ? source.label : value}
-    </span>
-  );
-};
-
 const LeadsList = () => {
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [filters, setFilters] = useState({});
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 20,
@@ -93,149 +100,308 @@ const LeadsList = () => {
 
   const navigate = useNavigate();
 
+  // Column Definitions for AG Grid
+  const columnDefs = [
+    { 
+      headerName: 'Name', 
+      valueGetter: params => {
+        const first = params.data.first_name || '';
+        const last = params.data.last_name || '';
+        return `${first} ${last}`.trim() || 'N/A';
+      },
+      sortable: true,
+      filter: true,
+      width: 150
+    },
+    { 
+      headerName: 'Email', 
+      field: 'email', 
+      sortable: true, 
+      filter: true,
+      width: 200
+    },
+    { 
+      headerName: 'Phone', 
+      field: 'phone', 
+      sortable: true, 
+      filter: true,
+      width: 150,
+      valueFormatter: params => params.value || 'N/A'
+    },
+    { 
+      headerName: 'Company', 
+      field: 'company', 
+      sortable: true, 
+      filter: true,
+      width: 150,
+      valueFormatter: params => params.value || 'N/A'
+    },
+    { 
+      headerName: 'City', 
+      field: 'city', 
+      sortable: true, 
+      filter: true,
+      width: 120,
+      valueFormatter: params => params.value || 'N/A'
+    },
+    { 
+      headerName: 'State', 
+      field: 'state', 
+      sortable: true, 
+      filter: true,
+      width: 100,
+      valueFormatter: params => params.value || 'N/A'
+    },
+    { 
+      headerName: 'Source', 
+      field: 'source', 
+      sortable: true, 
+      filter: true,
+      width: 120
+    },
+    { 
+      headerName: 'Status', 
+      field: 'status', 
+      sortable: true, 
+      filter: true,
+      width: 120,
+      cellRenderer: params => <StatusCell value={params.value} />
+    },
+    { 
+      headerName: 'Score', 
+      field: 'score', 
+      sortable: true, 
+      filter: true,
+      width: 100,
+      valueFormatter: params => `${params.value || 0}%`
+    },
+    { 
+      headerName: 'Lead Value', 
+      field: 'lead_value', 
+      sortable: true, 
+      filter: true,
+      width: 130,
+      valueFormatter: params => `$${(params.value || 0).toLocaleString()}`
+    },
+    { 
+      headerName: 'Qualified', 
+      field: 'is_qualified', 
+      sortable: true, 
+      filter: true,
+      width: 100,
+      valueFormatter: params => params.value ? 'Yes' : 'No'
+    },
+    { 
+      headerName: 'Created', 
+      field: 'created_at', 
+      sortable: true, 
+      filter: true,
+      width: 120,
+      valueFormatter: params => {
+        if (!params.value) return 'N/A';
+        return new Date(params.value).toLocaleDateString();
+      }
+    },
+    {
+      headerName: 'Actions',
+      cellRenderer: params => (
+        <ActionsCell 
+          data={params.data} 
+          onRefresh={() => loadLeads(pagination.page)} 
+        />
+      ),
+      width: 150,
+      sortable: false,
+      filter: false
+    }
+  ];
+
   // Load leads function
-  const loadLeads = async (page = 1) => {
+  const loadLeads = async (page = 1, currentFilters = filters) => {
     try {
       setLoading(true);
-      const response = await leadService.getLeads({ page, limit: 20 });
-      setLeads(response.data);
-      setPagination(response);
+      
+      // Build filter parameters
+      let filterParams = {};
+      if (leadService.buildFilterParams && typeof leadService.buildFilterParams === 'function') {
+        filterParams = leadService.buildFilterParams(currentFilters);
+      }
+      
+      const params = { 
+        page, 
+        limit: 20,
+        ...filterParams
+      };
+      
+      const response = await leadService.getLeads(params);
+      setLeads(response.data || []);
+      setPagination({
+        page: response.page || 1,
+        limit: response.limit || 20,
+        total: response.total || 0,
+        totalPages: response.totalPages || 1
+      });
     } catch (error) {
       toast.error('Failed to load leads');
+      console.error('Load leads error:', error);
+      setLeads([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // Refresh function for after delete
-  const refreshLeads = () => {
-    loadLeads(pagination.page);
-  };
-
-  // Initial load
+  // Load leads on component mount
   useEffect(() => {
     loadLeads();
   }, []);
 
-  // Complete column definitions with ALL required fields
-  const columnDefs = [
-    {
-      headerName: 'Actions',
-      cellRenderer: (params) => (
-        <ActionsRenderer 
-          data={params.data}
-          onRefresh={refreshLeads}
-        />
-      ),
-      width: 140,
-      sortable: false,
-      filter: false,
-      pinned: 'left'
-    },
-    { field: 'first_name', headerName: 'First Name', width: 120 },
-    { field: 'last_name', headerName: 'Last Name', width: 120 },
-    { field: 'email', headerName: 'Email', width: 200 },
-    { field: 'phone', headerName: 'Phone', width: 140 }, // ← ADDED
-    { field: 'company', headerName: 'Company', width: 150 },
-    { field: 'city', headerName: 'City', width: 120 },
-    { field: 'state', headerName: 'State', width: 100 }, // ← ADDED
-    {
-      field: 'source', // ← ADDED
-      headerName: 'Source',
-      width: 120,
-      cellRenderer: SourceRenderer
-    },
-    {
-      field: 'status',
-      headerName: 'Status',
-      width: 120,
-      cellRenderer: StatusRenderer
-    },
-    { field: 'score', headerName: 'Score', width: 100 },
-    {
-      field: 'lead_value', // ← ADDED
-      headerName: 'Lead Value',
-      width: 130,
-      cellRenderer: (params) => {
-        return params.value ? `$${Number(params.value).toLocaleString()}` : '$0';
-      }
-    },
-    {
-      field: 'is_qualified',
-      headerName: 'Qualified',
-      width: 100,
-      cellRenderer: (params) => params.value ? 'Yes' : 'No'
-    },
-    {
-      field: 'created_at',
-      headerName: 'Created',
-      width: 120,
-      cellRenderer: (params) => {
-        return params.value ? new Date(params.value).toLocaleDateString() : '';
-      }
-    }
-  ];
+  // Handle filter changes
+  const handleFilterChange = (newFilters) => {
+    setFilters(newFilters);
+    loadLeads(1, newFilters);
+  };
 
-  if (loading) {
-    return <LoadingSpinner message="Loading leads..." />;
-  }
+  // Clear filters
+  const handleClearFilters = () => {
+    setFilters({});
+    loadLeads(1, {});
+  };
+
+  // Handle pagination
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= pagination.totalPages) {
+      loadLeads(newPage);
+    }
+  };
 
   return (
-    <div className="leads-list-container">
-      <div className="leads-header">
+    <div className="leads-list-container" style={{ padding: '20px' }}>
+      {/* Header */}
+      <div className="leads-header" style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        marginBottom: '20px' 
+      }}>
         <div className="leads-title">
-          <h2>Leads Management</h2>
-          <p>Total: {pagination.total} leads</p>
+          <h2 style={{ margin: 0, marginBottom: '5px' }}>Leads Management</h2>
+          <p style={{ margin: 0, color: '#666' }}>
+            Total: {pagination.total} leads
+          </p>
         </div>
-
+        
         <div className="leads-actions">
           <button 
-            className="btn btn-primary"
             onClick={() => navigate('/leads/new')}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: '#007bff',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
           >
             Add New Lead
           </button>
         </div>
       </div>
 
-      <div className="ag-theme-alpine leads-grid">
-        <AgGridReact
-          rowData={leads}
-          columnDefs={columnDefs}
-          animateRows={true}
-          domLayout="normal"
+      {/* Filters */}
+      <div style={{ marginBottom: '20px' }}>
+        <LeadFilters 
+          onFilterChange={handleFilterChange}
+          onClearFilters={handleClearFilters}
         />
       </div>
 
-      <div className="pagination-container">
-        <div className="pagination-info">
-          Showing {((pagination.page - 1) * pagination.limit) + 1} to{' '}
-          {Math.min(pagination.page * pagination.limit, pagination.total)} of{' '}
-          {pagination.total} leads
+      {/* Loading State */}
+      {loading && leads.length === 0 ? (
+        <div style={{ 
+          textAlign: 'center', 
+          padding: '40px',
+          fontSize: '16px',
+          color: '#666'
+        }}>
+          Loading leads...
         </div>
-
-        <div className="pagination-controls">
-          <button
-            className="btn btn-outline"
-            onClick={() => loadLeads(pagination.page - 1)}
-            disabled={pagination.page <= 1}
+      ) : (
+        <>
+          {/* Data Grid */}
+          <div 
+            className="ag-theme-alpine" 
+            style={{ height: '500px', width: '100%', marginBottom: '20px' }}
           >
-            Previous
-          </button>
+            <AgGridReact
+              rowData={leads}
+              columnDefs={columnDefs}
+              animateRows={true}
+              domLayout="normal"
+              pagination={false}
+              suppressPaginationPanel={true}
+              rowHeight={50}
+            />
+          </div>
 
-          <span className="pagination-pages">
-            Page {pagination.page} of {pagination.totalPages}
-          </span>
-
-          <button
-            className="btn btn-outline"
-            onClick={() => loadLeads(pagination.page + 1)}
-            disabled={pagination.page >= pagination.totalPages}
-          >
-            Next
-          </button>
-        </div>
-      </div>
+          {/* Pagination */}
+          <div className="pagination-container" style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            padding: '10px 0'
+          }}>
+            <div className="pagination-info" style={{ color: '#666' }}>
+              Showing {((pagination.page - 1) * pagination.limit) + 1} to{' '}
+              {Math.min(pagination.page * pagination.limit, pagination.total)} of{' '}
+              {pagination.total} entries
+            </div>
+            
+            <div className="pagination-controls" style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '10px' 
+            }}>
+              <button 
+                onClick={() => handlePageChange(pagination.page - 1)}
+                disabled={pagination.page === 1}
+                style={{
+                  padding: '8px 12px',
+                  border: '1px solid #ddd',
+                  backgroundColor: pagination.page === 1 ? '#f8f9fa' : 'white',
+                  cursor: pagination.page === 1 ? 'not-allowed' : 'pointer',
+                  borderRadius: '4px'
+                }}
+              >
+                Previous
+              </button>
+              
+              <span style={{ 
+                padding: '8px 12px',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                backgroundColor: '#f8f9fa'
+              }}>
+                Page {pagination.page} of {pagination.totalPages}
+              </span>
+              
+              <button 
+                onClick={() => handlePageChange(pagination.page + 1)}
+                disabled={pagination.page >= pagination.totalPages}
+                style={{
+                  padding: '8px 12px',
+                  border: '1px solid #ddd',
+                  backgroundColor: pagination.page >= pagination.totalPages ? '#f8f9fa' : 'white',
+                  cursor: pagination.page >= pagination.totalPages ? 'not-allowed' : 'pointer',
+                  borderRadius: '4px'
+                }}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };
