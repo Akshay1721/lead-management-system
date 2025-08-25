@@ -11,24 +11,37 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Allowed origins for CORS
+const allowedOrigins = [
+  "http://localhost:3000",
+  "https://lead-management-system-tan.vercel.app" // Replace with your actual Vercel URL
+];
+
 // Middleware
 app.use(express.json());
 app.use(cookieParser());
 app.use(
   cors({
-    origin: process.env.CLIENT_URL,
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true); // Allow non-browser requests like Postman
+      if (allowedOrigins.indexOf(origin) === -1) {
+        const msg = "The CORS policy for this site does not allow access from the specified Origin.";
+        return callback(new Error(msg), false);
+      }
+      return callback(null, true);
+    },
     credentials: true,
   })
 );
 
-app.get('/', (req, res) => {
-  res.json({ 
-    message: 'Lead Management API Server is running!',
-    status: 'success',
+app.get("/", (req, res) => {
+  res.json({
+    message: "Lead Management API Server is running!",
+    status: "success",
     endpoints: {
-      auth: '/api/auth/register, /api/auth/login',
-      leads: '/api/leads'
-    }
+      auth: "/api/auth/register, /api/auth/login",
+      leads: "/api/leads",
+    },
   });
 });
 
