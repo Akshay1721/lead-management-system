@@ -17,6 +17,20 @@ const allowedOrigins = [
   "https://lead-management-system-tan.vercel.app" // Replace with your actual Vercel URL
 ];
 
+
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true); // allow non-browser requests like Postman or curl
+      if (allowedOrigins.indexOf(origin) === -1) {
+        const msg = "The CORS policy for this site does not allow access from the specified Origin.";
+        return callback(new Error(msg), false);
+      }
+      return callback(null, true);
+    },
+    credentials: true,
+  })
+);
 // Middleware
 app.use(express.json());
 app.use(cookieParser());
