@@ -21,6 +21,17 @@ app.use(
   })
 );
 
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'Lead Management API Server is running!',
+    status: 'success',
+    endpoints: {
+      auth: '/api/auth/register, /api/auth/login',
+      leads: '/api/leads'
+    }
+  });
+});
+
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/leads", leadRoutes);
